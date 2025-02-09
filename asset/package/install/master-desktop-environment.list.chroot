@@ -38,6 +38,14 @@ xsettingsd
 
 lxqt-policykit
 
+brightnessctl
+
+alsa-utils
+
+pamixer
+
+screengrab
+
 
 
 
