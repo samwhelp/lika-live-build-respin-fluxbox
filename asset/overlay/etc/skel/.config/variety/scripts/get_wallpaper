@@ -16,7 +16,6 @@ elif [ "$desktop" == "xubuntu" ] || [ "$XDG_CURRENT_DESKTOP" == "XFCE" ]; then
 
 # Lingmo OS
 elif [ "$XDG_CURRENT_DESKTOP" == "Lingmo" ]; then
-
         qdbus com.lingmo.Settings /Theme com.lingmo.Theme.wallpaper
 
 # LXDE/PCManFM
