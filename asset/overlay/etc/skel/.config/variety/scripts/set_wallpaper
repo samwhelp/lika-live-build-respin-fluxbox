@@ -6,7 +6,7 @@
 # login screen or whatever you desire.
 #
 # Occasionally new versions of this script are released to bring support for new desktops. To apply them, you
-# should either delete this copy (in ~/.config/data/scripts/) and restart Variety, or merge in the changes yourself.
+# should either delete this copy (in ~/.config/variety/scripts/) and restart Variety, or merge in the changes yourself.
 # Bug fixes are automatically applied by Variety provided the local copy is never changed.
 #
 # PARAMETERS:
@@ -142,6 +142,11 @@ if [ "${KDE_FULL_SESSION}" == "true" ]; then
         # Reuse the exit code from dbus
         dbus_exitcode="$?"
 
+        if [[ "$dbus_exitcode" -eq 0 && "${KDE_SESSION_VERSION}" -eq '6' ]]; then
+            # If successful, set lockscreen on KDE 6
+            kwriteconfig6 --file kscreenlockerrc --group Greeter --group Wallpaper --group org.kde.image --group General --key Image "$WP"
+        fi
+
         if [[ "$dbus_exitcode" -ne 0 && "${KDE_SESSION_VERSION}" -eq '5' ]]; then
             # If the script fails, show a notification.
             kdialog --title "Variety: cannot change Plasma wallpaper" --passivepopup "Could not change the Plasma 5 wallpaper; \
@@ -204,55 +209,57 @@ if [[ $rc = 0 ]] ; then
     done
 fi
 
-
 # Lingmo OS
 if [ "$XDG_CURRENT_DESKTOP" == "Lingmo" ]; then
-
     qdbus com.lingmo.Settings /Theme com.lingmo.Theme.setWallpaper "$WP" 2> /dev/null
-
 fi
-
 
 # LXDE/PCmanFM
 if [ "$XDG_CURRENT_DESKTOP" == "LXDE" ]; then
-    pcmanfm --set-wallpaper "$WP" 2> /dev/null
+    pcmanfm-qt --wallpaper-mode zoom --set-wallpaper "$WP" 2> /dev
+/null
 fi
 
 # LXQt/PCmanFM-qt
 if [ "$XDG_CURRENT_DESKTOP" == "LXQt" ]; then
-    pcmanfm-qt --wallpaper-mode zoom --set-wallpaper "$WP" 2> /dev/null
+    pcmanfm-qt --set-wallpaper "$WP" 2> /dev/null
 fi
 
 # For simple WMs, use either feh or nitrogen
 # Implementation note: this uses spaces around list items to enforce matching whole words.
 # This also means that an empty variable won't cause false positives, since it expands to "  "
-SIMPLE_WMS=("bspwm" "dwm" "herbstluftwm" "i3" "i3-gnome" "i3-with-shmlog" "jwm" "LeftWM" "openbox" "fluxbox" "qtile" "qtile-venv" "spectrwm" "xmonad")
+SIMPLE_WMS=("bspwm" "dwm" "herbstluftwm" "i3" "i3-gnome" "i3-with-shmlog" "jwm" "jdwm" "LeftWM" "openbox" "qtile" "qtile-venv" "spectrwm" "xmonad")
 if [[ " ${SIMPLE_WMS[*]} " = *" $XDG_CURRENT_DESKTOP "* || " ${SIMPLE_WMS[*]} " = *" $XDG_SESSION_DESKTOP "* ||
       " ${SIMPLE_WMS[*]} " = *" $DESKTOP_SESSION "* ]]; then
-	if command -v "feh" >/dev/null 2>&1; then
-	      # TODO: This should take the scaling parameter $4 into account and use other options than --bg-fill
+    if command -v "feh" >/dev/null 2>&1; then
+        # TODO: This should take the scaling parameter $4 into account and use other options than --bg-fill
         feh --bg-fill "$WP" 2> /dev/null
     elif command -v "nitrogen" >/dev/null 2>&1; then
-	      # TODO: This should take the scaling parameter $4 into account and use other options than --set-zoom-fill
+          # TODO: This should take the scaling parameter $4 into account and use other options than --set-zoom-fill
         nitrogen --set-zoom-fill --save "$WP" 2> /dev/null
     fi
 fi
-PID=`pidof swaybg`
-if [[ -n $PID ]]; then
-    # If swaybg is available, use it as prevents system freeze.
-    # See https://github.com/swaywm/sway/issues/5606
-    if command -v "swaybg" >/dev/null 2>&1; then
-        # Grey background flicker is prevented by killing old swaybg process after new one.
-        # See https://github.com/swaywm/swaybg/issues/17#issuecomment-851680720
-        swaybg -i "$WP" -m fill &
-        if [ ! -z "$PID" ]; then
-            sleep 1
-            kill $PID 2>/dev/null
-        fi
-    else
-        swaymsg output "*" bg "$WP" fill 2> /dev/null
-    fi
+
+# Fluxbox
+if [[ "fluxbox" == "$XDG_CURRENT_DESKTOP" || "fluxbox" == "$DESKTOP_SESSION" ]]; then
+    fbsetbg "$WP"
 fi
+
+# If swaybg is available, use it as prevents system freeze.
+# See https://github.com/swaywm/sway/issues/5606
+if command -v "swaybg" >/dev/null 2>&1; then
+    # Grey background flicker is prevented by killing old swaybg process after new one.
+    # See https://github.com/swaywm/swaybg/issues/17#issuecomment-851680720
+    PID=`pidof swaybg`
+    swaybg -i "$WP" -m fill &
+    if [ ! -z "$PID" ]; then
+        sleep 1
+        kill $PID 2>/dev/null
+    fi
+else
+    swaymsg output "*" bg "$WP" fill 2> /dev/null
+fi
+
 
 # trinity
 if [ "$XDG_CURRENT_DESKTOP" == "Trinity" ]; then
@@ -263,19 +270,19 @@ fi
 # MATE after 1.6
 gsettings set org.mate.background picture-filename "$WP" 2> /dev/null
 if [ "$(gsettings get org.mate.desktop.background picture-options 2>/dev/null)" == "'none'" ]; then
-	gsettings set org.mate.desktop.background picture-options 'zoom'
+    gsettings set org.mate.desktop.background picture-options 'zoom'
 fi
 if [[ "$4" =~ ^(wallpaper|centered|scaled|stretched|zoom|spanned)$ ]]; then
-  gsettings set org.mate.desktop.background picture-options "$4"
+    gsettings set org.mate.desktop.background picture-options "$4"
 fi
 
 # Cinnamon after 2.0
 gsettings set org.cinnamon.desktop.background picture-uri "file://$WP" 2> /dev/null
 if [ "$(gsettings get org.cinnamon.desktop.background picture-options 2>/dev/null)" == "'none'" ]; then
-	gsettings set org.cinnamon.desktop.background picture-options 'zoom'
+    gsettings set org.cinnamon.desktop.background picture-options 'zoom'
 fi
 if [[ "$4" =~ ^(wallpaper|centered|scaled|stretched|zoom|spanned)$ ]]; then
-  gsettings set org.cinnamon.desktop.background picture-options "$4"
+    gsettings set org.cinnamon.desktop.background picture-options "$4"
 fi
 
 # Awesome Window Manager
@@ -283,7 +290,7 @@ fi
 # NOTE: This config will change the wallpaper after your current awesome theme sets it.
 # As such, the theme's wallpaper will briefly appear before being replaced with Variety's wallpaper.
 if [[ "$XDG_SESSION_DESKTOP $DESKTOP_STARTUP_ID $DESKTOP_SESSION $XDG_CURRENT_DESKTOP" == *"awesome"* ]]; then
-	echo "for s in screen do require(\"gears\").wallpaper.maximized(\"$1\", s) end" | awesome-client
+    echo "for s in screen do require(\"gears\").wallpaper.maximized(\"$1\", s) end" | awesome-client
 fi
 
 # =====================================================================================
